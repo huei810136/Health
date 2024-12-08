@@ -1,6 +1,7 @@
 package tw.edu.pu.csim.s1113426.health
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,6 +22,10 @@ import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.text.input.KeyboardType
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +54,16 @@ fun Birth(m: Modifier) {
     var userWeight by remember { mutableStateOf("")}
     var userHeight by remember { mutableStateOf("")}
     var msg by remember { mutableStateOf("")}
+    val db = Firebase.firestore
+    val weight = userWeight.toFloatOrNull()
+    val height = userHeight.toFloatOrNull()
+    if (weight != null && height != null) {
+        val user = Person(userName, weight, height)
+        // 保存操作
+    } else {
+        msg = "體重或身高格式錯誤"
+    }
+
 
 
     // BMI 計算函數
@@ -131,10 +146,41 @@ fun Birth(m: Modifier) {
             modifier = m
         )
         Row {
-            Button(onClick = { }) {
+            Button(onClick = {
+                val user = Person(userName, userWeight.toFloat(), userHeight.toFloat())
+                db.collection("users")
+                    //.add(user)
+                    .document(userName)
+                    .set(user)
+                    .addOnSuccessListener { documentReference ->
+                        msg = "新增/異動資料成功"
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("FirestoreError", "新增/異動資料失敗", e)
+                        msg = "新增/異動資料失敗：" + e.toString()
+                    }
+
+            }) {
                 Text("新增/修改資料")
             }
-            Button(onClick = {  }) {
+            Button(onClick = {
+                db.collection("users")
+                    .whereEqualTo("userName", userName)
+                    .get()
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            msg = ""
+                            for (document in task.result!!) {
+                                msg += "文件id：" + document.id + "\n名字：" + document.data["userName"] +
+                                        "\n體重：" + document.data["userWeight"].toString() + "\n\n"
+                            }
+                            if (msg == "") {
+                                msg = "查無資料"
+                            }
+                        }
+                    }
+
+            }) {
                 Text("查詢資料")
             }
             Button(onClick = {  }) {
@@ -145,3 +191,8 @@ fun Birth(m: Modifier) {
 
     }
 }
+data class Person(
+    var userName: String,
+    var userWeight: Float,
+    var userHeight: Float
+)
